@@ -19,7 +19,6 @@ pub struct Args {
     pub wait_time: u64,
 
     /// How long should I wait before retrying to post after an error? (in seconds)
-    /// Default is 5 seconds
     #[arg(short, long, default_value_t = 5)]
     pub retry_time: u64,
 }
