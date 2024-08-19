@@ -56,12 +56,12 @@ pub async fn start_cross_rtl_loop(args: Args, ri: RedditInfo, li: LemmyInfo) -> 
                 tracing::info!("{:#?}", data);
 
                 for child in data.data.children {
-                    let title = child.data.title;
+                    let title = child.data.title.trim().to_owned();
                     let author = child.data.author;
-                    let body = child.data.selftext
+                    let body = child.data.selftext.trim().to_owned()
                         + &format!(
                             "\n\n\
-                        This post was authored by: /u/{author} on Reddit\n\n\
+                        This post was authored by: /u/{author} on Reddit\n      \
                         If you liked this post, give them a visit!"
                         );
                     let nsfw_flag = child.data.over_18;
@@ -92,9 +92,10 @@ pub async fn start_cross_rtl_loop(args: Args, ri: RedditInfo, li: LemmyInfo) -> 
                                         "\
                                     Error when posting Reddit post with title: \"{title}\".\n\
                                     Error encountered: {e} \n\
-                                    Retrying after 5 seconds..."
+                                    Retrying after {} seconds...",
+                                        args.retry_time
                                     );
-                                    thread::sleep(Duration::from_secs(5));
+                                    thread::sleep(Duration::from_secs(args.retry_time));
                                 }
                             };
                         }
@@ -107,6 +108,6 @@ pub async fn start_cross_rtl_loop(args: Args, ri: RedditInfo, li: LemmyInfo) -> 
             }
         }
         // Wait for a full day before looping again
-        thread::sleep(Duration::from_secs(86400));
+        thread::sleep(Duration::from_secs(args.wait_time));
     }
 }
