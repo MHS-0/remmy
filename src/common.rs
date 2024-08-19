@@ -6,7 +6,7 @@ use std::{thread, time::Duration};
 use lemmy_client::lemmy_api_common::post::CreatePost;
 use roux::{util::FeedOption, Subreddit};
 
-use crate::{lemmy::LemmyInfo, reddit::RedditInfo};
+use crate::{cli::Args, lemmy::LemmyInfo, reddit::RedditInfo};
 
 /// Get environment variable with the given key and panic
 /// if it isn't found.
@@ -28,7 +28,7 @@ pub enum BotMode {
 
 /// Start a loop to cross post Reddit stuff to
 /// Lemmy.
-pub async fn start_cross_rtl_loop(ri: RedditInfo, li: LemmyInfo) -> ! {
+pub async fn start_cross_rtl_loop(args: Args, ri: RedditInfo, li: LemmyInfo) -> ! {
     // Ctrl+c handling happens here
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.unwrap();
@@ -43,13 +43,14 @@ pub async fn start_cross_rtl_loop(ri: RedditInfo, li: LemmyInfo) -> ! {
 
     loop {
         let subreddit = Subreddit::new_oauth(&ri.subreddit, &ri.me.client);
+        let limit = args.num;
         let feed_options = Some(
             FeedOption::new()
-                .limit(5)
+                .limit(limit.into())
                 .period(roux::util::TimePeriod::Today),
         );
 
-        match subreddit.top(5, feed_options).await {
+        match subreddit.top(limit.into(), feed_options).await {
             Ok(data) => {
                 tracing::info!("Successfully retrieved today's top posts");
                 tracing::info!("{:#?}", data);
@@ -74,25 +75,29 @@ pub async fn start_cross_rtl_loop(ri: RedditInfo, li: LemmyInfo) -> ! {
                         url,
                         ..Default::default()
                     };
-                    loop {
-                        match li.me.create_post(post.clone()).await {
-                            Ok(post_info) => {
-                                tracing::info!(
-                                    "Successfully posted on Lemmy!\n\
+                    if args.dry_run {
+                        tracing::info!("{post:#?}");
+                    } else {
+                        loop {
+                            match li.me.create_post(post.clone()).await {
+                                Ok(post_info) => {
+                                    tracing::info!(
+                                        "Successfully posted on Lemmy!\n\
                                     Post's info: {post_info:#?}"
-                                );
-                                break;
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    "\
+                                    );
+                                    break;
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        "\
                                     Error when posting Reddit post with title: \"{title}\".\n\
                                     Error encountered: {e} \n\
                                     Retrying after 5 seconds..."
-                                );
-                                thread::sleep(Duration::from_secs(5));
-                            }
-                        };
+                                    );
+                                    thread::sleep(Duration::from_secs(5));
+                                }
+                            };
+                        }
                     }
                 }
             }
