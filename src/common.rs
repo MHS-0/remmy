@@ -61,7 +61,7 @@ pub async fn start_cross_rtl_loop(args: Args, ri: RedditInfo, li: LemmyInfo) -> 
                     let body = child.data.selftext.trim().to_owned()
                         + &format!(
                             "\n\n\
-                        This post was authored by: /u/{author} on Reddit\n      \
+                        This post was authored by: /u/{author} on Reddit\n\n\
                         If you liked this post, give them a visit!"
                         );
                     let nsfw_flag = child.data.over_18;
