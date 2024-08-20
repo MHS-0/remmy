@@ -5,8 +5,11 @@ use std::{collections::HashMap, thread, time::Duration};
 use anyhow::Result;
 use lemmy_client::{
     lemmy_api_common::{
-        community::GetCommunity, lemmy_db_schema::newtypes::CommunityId, person::Login,
-        post::CreatePost,
+        community::GetCommunity,
+        lemmy_db_schema::newtypes::CommunityId,
+        person::Login,
+        post::{CreatePost, PostResponse},
+        LemmyErrorType,
     },
     ClientOptions, LemmyClient, LemmyRequest,
 };
@@ -14,6 +17,7 @@ use lemmy_client::{
 use crate::{
     cli::Args,
     common::{get_env_var, CommonPost, Platform},
+    config::Config,
 };
 
 /// Struct containing info needed to do operations
@@ -39,15 +43,15 @@ impl LemmyInfo {
 ///
 /// Panics if the variables are not given or correct,
 /// or if there are connection issues.
-pub async fn initialize_lemmy_client() -> LemmyInfo {
+pub async fn initialize_lemmy_client(config: Config) -> LemmyInfo {
     tracing::info!("Setting up and validating the Lemmy client...");
 
     // TODO: We could do this by using a serde serialized yaml file too.
     // Get Lemmy related env variables
-    let lemmy_instance = get_env_var("LEMMY_INSTANCE");
-    let lemmy_username = get_env_var("LEMMY_USERNAME");
-    let lemmy_password = get_env_var("LEMMY_PASSWORD");
-    let lemmy_community_name = get_env_var("LEMMY_COMMUNITY");
+    let lemmy_instance = config.lemmy.instance;
+    let lemmy_username = config.lemmy.username;
+    let lemmy_password = config.lemmy.password;
+    let lemmy_community_name = config.lemmy.community;
 
     // Setup the Lemmy client
     let mut lemmy_client = LemmyClient::new(ClientOptions {
@@ -90,8 +94,9 @@ pub async fn initialize_lemmy_client() -> LemmyInfo {
     LemmyInfo::new(lemmy_client, lemmy_community_name, lemmy_community_id)
 }
 
-/// Submit a post on Lemmy
-pub async fn submit_post(args: &Args, post: CommonPost, li: &LemmyInfo) -> Result<()> {
+/// Converts a CommonPost struct to a CreatePost Lemmy
+/// request
+pub fn convert_to_lemmy_post(post: CommonPost, li: &LemmyInfo) -> CreatePost {
     let title = post.title;
     let author = post.author;
     let platform = match post.platform {
@@ -107,39 +112,20 @@ pub async fn submit_post(args: &Args, post: CommonPost, li: &LemmyInfo) -> Resul
     let nsfw_flag = post.nsfw;
     let url = post.url;
 
-    let post = CreatePost {
+    CreatePost {
         community_id: li.community_id,
         name: title.clone(),
         body: Some(body),
         nsfw: Some(nsfw_flag),
         url,
         ..Default::default()
-    };
-    if args.dry_run {
-        tracing::info!("{post:#?}");
-    } else {
-        loop {
-            match li.me.create_post(post.clone()).await {
-                Ok(post_info) => {
-                    tracing::info!(
-                        "Successfully posted on Lemmy!\n\
-                                    Post's info: {post_info:#?}"
-                    );
-                    break;
-                }
-                Err(e) => {
-                    tracing::error!(
-                        "\
-                                    Error when posting Reddit post with title: \"{title}\".\n\
-                                    Error encountered: {e} \n\
-                                    Retrying after {} seconds...",
-                        args.retry_time
-                    );
-                    thread::sleep(Duration::from_secs(args.retry_time));
-                }
-            };
-        }
     }
+}
 
-    Ok(())
+/// Submit a post on Lemmy
+///
+/// Returns the result of the attempt at submitting
+/// the post
+pub async fn submit_post(post: CreatePost, li: &LemmyInfo) -> Result<PostResponse, LemmyErrorType> {
+    li.me.create_post(post.clone()).await
 }

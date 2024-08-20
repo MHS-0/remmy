@@ -1,10 +1,19 @@
 //! Stuff related to the cli options
 
+use std::path::PathBuf;
+
 use clap::Parser;
 
-/// Command-Line interface configuration happens here
-#[derive(Parser)]
+use crate::common::{SortMode, TimeFrame};
+
+/// Command-Line interface for Remmy
+/// A Reddit to Lemmy bot
+#[derive(Parser, Debug)]
 pub struct Args {
+    /// Path to config file
+    #[arg(short, long)]
+    pub config: PathBuf,
+
     /// Number of posts to make
     #[arg(short, long, default_value_t = 5)]
     pub num: u8,
@@ -23,4 +32,12 @@ pub struct Args {
     /// How long should I wait before retrying to post after an error? (in seconds)
     #[arg(short, long, default_value_t = 5)]
     pub retry_time: u64,
+
+    /// How to sort the posts of the source platform?
+    #[arg(value_enum, short, long, default_value_t = SortMode::Top)]
+    pub sorting: SortMode,
+
+    /// what time frame to use for the posts of the source platform?
+    #[arg(value_enum, short, long, default_value_t = TimeFrame::Day)]
+    pub time_frame: TimeFrame,
 }

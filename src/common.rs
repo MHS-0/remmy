@@ -3,13 +3,16 @@
 
 use std::{thread, time::Duration};
 
+use clap::ValueEnum;
 use lemmy_client::lemmy_api_common::post::CreatePost;
 use roux::{util::FeedOption, Subreddit};
+use serde::{Deserialize, Serialize};
 
 use crate::{cli::Args, lemmy::LemmyInfo, reddit::RedditInfo};
 
 /// Get environment variable with the given key and panic
 /// if it isn't found.
+#[allow(unused)]
 pub fn get_env_var(key: &str) -> String {
     std::env::var(key).expect(&format!("{key} environment variable wasn't set"))
 }
@@ -35,7 +38,7 @@ pub enum Platform {
 
 /// Enum representing different ways to sort the
 /// posts in a community, such as a subreddit
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum SortMode {
     Top,
     Hot,
@@ -45,7 +48,7 @@ pub enum SortMode {
 
 /// Enum representing different ways to sort the
 /// posts in a community, such as a subreddit
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum TimeFrame {
     Hour,
     Day,
@@ -58,7 +61,7 @@ pub enum TimeFrame {
 /// What should the program do?
 // TODO: We could expand this in the future
 // to do different things
-#[derive(Default)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum BotMode {
     /// Crosspost from Reddit to Lemmy
     #[default]
@@ -83,11 +86,32 @@ pub async fn start_cross_rtl_loop(args: Args, ri: RedditInfo, li: LemmyInfo) -> 
     );
 
     loop {
-        let reponse = crate::reddit::get_posts(&ri, args.num, SortMode::Top, TimeFrame::Day).await;
+        let reponse = crate::reddit::get_posts(&ri, args.num, args.sorting, args.time_frame).await;
         match reponse {
             Ok(posts) => {
                 for post in posts {
-                    crate::lemmy::submit_post(&args, post, &li).await;
+                    let lemmy_post = crate::lemmy::convert_to_lemmy_post(post, &li);
+
+                    if args.dry_run {
+                        tracing::info!("Lemmy post created but not submitted: {lemmy_post:#?}");
+                    } else {
+                        loop {
+                            match crate::lemmy::submit_post(lemmy_post.clone(), &li).await {
+                                Ok(post) => {
+                                    tracing::info!("Submitted new post to Lemmy!:\n {post:#?}");
+                                    break;
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Submitting post failed. \
+                                        Retrying after {} seconds...",
+                                        args.retry_time
+                                    );
+                                    thread::sleep(Duration::from_secs(args.retry_time));
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Wait before looping again
