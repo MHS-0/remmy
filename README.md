@@ -5,12 +5,12 @@ It's WIP, soo, it doesn't have too many features yet. Feel free to use it and mo
 Oh, usage!:
 
 Create a config file in yaml, such as remmy.yaml, and then execute the program like so:
-'''sh
+```sh
 cargo r -r -- -c remmy.yaml
-'''
+```
 
 Your remmy.yaml file should look something like this:
-'''yaml
+```yaml
 reddit:
   client_id: REDDIT_CLIENT_ID
   client_secret: REDDIT_CLIENT_SECRET
@@ -23,7 +23,7 @@ lemmy:
   community: LEMMY_COMMUNITY
   username: LEMMY_USERNAME
   password: LEMMY_PASSWORD
-'''
+```
 
 - REDDIT_CLIENT_ID -> The ID of your Reddit App (Look up what it is if you don't know what I mean)
 - REDDIT_CLIENT_SECRET -> The secret of your Reddit App
@@ -37,7 +37,7 @@ lemmy:
 
 Command line options:
 
-'''sh
+```sh
 Command-Line interface for Remmy A Reddit to Lemmy bot
 
 Usage: remmy [OPTIONS] --config <CONFIG>
@@ -57,6 +57,6 @@ Options:
                                  [default: day] [possible values: hour, day, week, month, year,
                                  all]
   -h, --help                     Print help
-'''
+```
 
 After executing, (by default and if no other cli option is specified) the bot will take 5 top posts of the day of the subreddit of your choice, post it (the text for now) on the Lemmy community of your choice, and it'll do it on loop once every day.
