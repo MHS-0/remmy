@@ -1,3 +1,5 @@
+//! Stuff related to the cli options
+
 use clap::Parser;
 
 /// Command-Line interface configuration happens here

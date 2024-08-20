@@ -1,11 +1,14 @@
 //! Reddit stuff
 
-use roux::{Me, Reddit};
+use roux::{
+    util::{FeedOption, RouxError},
+    Me, Reddit, Submissions, Subreddit,
+};
 
-use crate::common::get_env_var;
+use crate::common::{get_env_var, CommonPost, Platform, SortMode, TimeFrame};
 
-/// Struct containing a validated Reddit client,
-/// and the subreddit of interest
+/// Struct containing needed info to do operations
+/// with Reddit
 pub struct RedditInfo {
     /// An authorized Reddit client
     pub me: Me,
@@ -51,4 +54,48 @@ pub async fn initialize_reddit_client() -> RedditInfo {
     };
 
     RedditInfo::new(reddit_client.unwrap(), subreddit)
+}
+
+/// Get the specified number of posts from the
+/// subreddit that the program was started with,
+/// sorted by the specified value
+pub async fn get_posts(
+    ri: &RedditInfo,
+    limit: u8,
+    sort: SortMode,
+    time_frame: TimeFrame,
+) -> Result<Vec<CommonPost>, RouxError> {
+    let subreddit = Subreddit::new_oauth(&ri.subreddit, &ri.me.client);
+    let feed_options = Some(
+        FeedOption::new()
+            .limit(limit.into())
+            .period(roux::util::TimePeriod::Today),
+    );
+
+    let response = subreddit.top(limit.into(), feed_options).await?;
+    tracing::info!("Successfully retrieved posts from Reddit");
+    tracing::info!("posts: {:#?}", response);
+
+    let mut posts = vec![];
+
+    for child in response.data.children {
+        let title = child.data.title.trim().to_owned();
+        let author = child.data.author;
+        let body = child.data.selftext.trim().to_owned();
+        let nsfw = child.data.over_18;
+        let url = child.data.url;
+
+        let post = CommonPost {
+            title,
+            body,
+            nsfw,
+            url,
+            author,
+            platform: Platform::Reddit,
+        };
+
+        posts.push(post);
+    }
+
+    Ok(posts)
 }
